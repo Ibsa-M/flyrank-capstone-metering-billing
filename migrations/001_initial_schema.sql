@@ -21,19 +21,22 @@ CREATE TABLE subscriptions (
     current_period_start TIMESTAMP WITH TIME ZONE NOT NULL,
     current_period_end TIMESTAMP WITH TIME ZONE NOT NULL,
     stripe_subscription_id VARCHAR(255),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT unique_active_tenant_sub UNIQUE (tenant_id, status)
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX unique_active_subscription_per_tenant ON subscriptions (tenant_id) WHERE status = 'active';
 
 CREATE TABLE usage_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES tenants(id),
     idempotency_key VARCHAR(255) NOT NULL,
     request_hash VARCHAR(64) NOT NULL,
-    type VARCHAR(50) NOT NULL, -- 'api_call' or 'ai_token'
+    type VARCHAR(50) NOT NULL, -- 'api_call' or 'ai_tokens'
     quantity INTEGER NOT NULL DEFAULT 0,
     input_tokens INTEGER NOT NULL DEFAULT 0,
+    cached_input_tokens INTEGER NOT NULL DEFAULT 0,
     output_tokens INTEGER NOT NULL DEFAULT 0,
+    reasoning_tokens INTEGER NOT NULL DEFAULT 0,
     cost_cents INTEGER NOT NULL,
     response_snapshot JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
