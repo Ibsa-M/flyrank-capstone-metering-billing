@@ -1,5 +1,5 @@
 const request = require('supertest');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 const app = require('../src/app');
 const db = require('../src/db');
 
@@ -7,8 +7,8 @@ describe('Billing Logic (Phase 2)', () => {
   
   // Helper to create a throwaway tenant and subscription for testing
   async function createTestTenant(status = 'active', apiCallLimit = 1000) {
-    const tenantId = uuidv4();
-    const planId = uuidv4();
+    const tenantId = crypto.randomUUID();
+    const planId = crypto.randomUUID();
     const now = new Date();
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
@@ -36,7 +36,7 @@ describe('Billing Logic (Phase 2)', () => {
 
   it('test_idempotent_retry_no_duplicate', async () => {
     const { tenantId } = await createTestTenant();
-    const idempotencyKey = uuidv4();
+    const idempotencyKey = crypto.randomUUID();
     const payload = { type: 'api_call', quantity: 1 };
 
     // First request
@@ -66,7 +66,7 @@ describe('Billing Logic (Phase 2)', () => {
 
   it('test_idempotency_payload_mismatch', async () => {
     const { tenantId } = await createTestTenant();
-    const idempotencyKey = uuidv4();
+    const idempotencyKey = crypto.randomUUID();
 
     await request(app)
       .post('/generate')
@@ -92,13 +92,13 @@ describe('Billing Logic (Phase 2)', () => {
     await db.query(`
       INSERT INTO usage_events (tenant_id, idempotency_key, request_hash, type, quantity, cost_cents) 
       VALUES ($1, $2, 'seed_hash', 'api_call', 4, 4)
-    `, [tenantId, uuidv4()]);
+    `, [tenantId, crypto.randomUUID()]);
 
     // Request 1: at limit-1 -> limit (should succeed)
     const res1 = await request(app)
       .post('/generate')
       .set('x-tenant-id', tenantId)
-      .set('Idempotency-Key', uuidv4())
+      .set('Idempotency-Key', crypto.randomUUID())
       .send({ type: 'api_call', quantity: 1 });
     
     expect(res1.status).toBe(201);
@@ -108,7 +108,7 @@ describe('Billing Logic (Phase 2)', () => {
     const res2 = await request(app)
       .post('/generate')
       .set('x-tenant-id', tenantId)
-      .set('Idempotency-Key', uuidv4())
+      .set('Idempotency-Key', crypto.randomUUID())
       .send({ type: 'api_call', quantity: 1 });
 
     expect(res2.status).toBe(429);
@@ -124,7 +124,7 @@ describe('Billing Logic (Phase 2)', () => {
     await db.query(`
       INSERT INTO usage_events (tenant_id, idempotency_key, request_hash, type, quantity, cost_cents) 
       VALUES ($1, $2, 'seed_hash', 'api_call', 5, 5)
-    `, [tenantId, uuidv4()]);
+    `, [tenantId, crypto.randomUUID()]);
 
     // Fire 10 concurrent requests
     const promises = [];
@@ -133,7 +133,7 @@ describe('Billing Logic (Phase 2)', () => {
         request(app)
           .post('/generate')
           .set('x-tenant-id', tenantId)
-          .set('Idempotency-Key', uuidv4())
+          .set('Idempotency-Key', crypto.randomUUID())
           .send({ type: 'api_call', quantity: 1 })
       );
     }
@@ -158,7 +158,7 @@ describe('Billing Logic (Phase 2)', () => {
     const res = await request(app)
       .post('/generate')
       .set('x-tenant-id', tenantId)
-      .set('Idempotency-Key', uuidv4())
+      .set('Idempotency-Key', crypto.randomUUID())
       .send({ type: 'api_call', quantity: 1 });
 
     expect(res.status).toBe(402);

@@ -1,13 +1,13 @@
 const db = require('../src/db');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 async function seedQuota(tenantId, planId, targetUsageApi, targetUsageAi) {
   const client = await db.getClient();
   try {
     await client.query('BEGIN');
     
-    const idempotencyKeyApi = uuidv4();
-    const idempotencyKeyAi = uuidv4();
+    const idempotencyKeyApi = crypto.randomUUID();
+    const idempotencyKeyAi = crypto.randomUUID();
 
     if (targetUsageApi > 0) {
       await client.query(`
