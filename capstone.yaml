@@ -1,2 +1,8 @@
 version: 1.0
 project: flyrank-capstone-metering-billing
+base_url: http://localhost:3000
+commands:
+  install: npm install
+  seed: node src/seed.js
+  run: npm start
+  test: npx jest

@@ -35,3 +35,11 @@ Output: PASS — 324 ms, 1 passed. Same event sent twice → processed_stripe_ev
 ### Phase 3: Unrecognized Plan Fails Loud (2.4.d)
 Command: npx jest tests/stripe.test.js -t "test_customer_subscription_updated_unrecognized_plan"
 Output: PASS — 272 ms, 1 passed. Fake price_id → 500 (StripeInvalidRequestError: No such price), fails loud as designed.
+
+### Phase 4: Pricing Integration (DoD 8)
+Command: npx jest tests/pricing.test.js -t "test_pricing_integration_generate_and_rollup"
+Output: PASS — 69 ms, 1 passed. Verified cost_cents matches hand-calculated math perfectly (12 cents).
+
+### Phase 4: Comparative Pricing Rules (DoD 8)
+Command: npx jest tests/pricing.test.js -t "test_cached_input_cheaper_than_fresh|test_reasoning_tokens_priced_identically_to_output"
+Output: PASS — 2 tests passed. Verified cached tokens are cheaper than fresh (25% cost), and reasoning tokens are billed strictly at the output rate.
