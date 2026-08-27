@@ -1,22 +1,37 @@
 const crypto = require('crypto');
 const db = require('../db');
+const pricingConfig = require('../config/pricing.config');
 
 function hashRequest(body) {
   return crypto.createHash('sha256').update(JSON.stringify(body || {})).digest('hex');
 }
 
 /**
- * Calculates placeholder cost for Phase 2.
- * Real pricing rules to be implemented in Phase 4.
+ * Pure function to calculate real cost based on pricing configuration.
+ * Returns cost in cents.
  */
-function calculatePlaceholderCost(type, payload) {
+function calculateCost(type, payload) {
   if (type === 'api_call') {
-    return (payload.quantity || 1) * 1; // 1 cent per API call
+    const quantity = payload.quantity || 1;
+    return quantity * pricingConfig.API_CALL_RATE;
   } else if (type === 'ai_tokens') {
     const tokens = payload.tokens || {};
-    const input = tokens.input || 0;
-    const output = tokens.output || 0;
-    return (input + output) * 1; // 1 cent per token
+    const inputTokens = tokens.input || 0;
+    const cachedInputTokens = tokens.cached_input || 0;
+    const outputTokens = tokens.output || 0;
+    const reasoningTokens = tokens.reasoning || 0;
+
+    // Reasoning tokens are billed at the OUTPUT_TOKEN_RATE
+    const totalTokenCostCents = Math.ceil(
+      (
+        (inputTokens * pricingConfig.INPUT_TOKEN_RATE) +
+        (cachedInputTokens * pricingConfig.CACHED_INPUT_TOKEN_RATE) +
+        (outputTokens * pricingConfig.OUTPUT_TOKEN_RATE) +
+        (reasoningTokens * pricingConfig.OUTPUT_TOKEN_RATE) // Same rate as output
+      ) / 1000
+    );
+    
+    return totalTokenCostCents;
   }
   return 0;
 }
@@ -138,7 +153,7 @@ async function recordUsageEvent(tenantId, idempotencyKey, payload) {
     }
 
     // 4. Finalize
-    const costCents = calculatePlaceholderCost(type, payload);
+    const costCents = calculateCost(type, payload);
     const responseSnapshot = {
       usage_event_id: insertedRowId,
       cost_cents: costCents,
@@ -223,5 +238,6 @@ async function getUsageRollup(tenantId) {
 
 module.exports = {
   recordUsageEvent,
-  getUsageRollup
+  getUsageRollup,
+  calculateCost
 };
