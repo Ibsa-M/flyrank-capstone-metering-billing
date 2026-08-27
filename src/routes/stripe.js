@@ -96,21 +96,20 @@ webhookRouter.post('/', async (req, res) => {
       const sub = await stripe.subscriptions.retrieve(subscriptionId, { expand: ['items.data.price.product'] });
       const productName = sub.items.data[0].price.product.name;
 
-      // Find plan by exact product name match
+      // Find plan by exact price ID match
+      const stripePriceId = sub.items.data[0].price.id;
       const planRes = await db.query(
-        "SELECT id FROM plans WHERE name = $1 OR name = $2",
-        [productName, productName + ' Plan']
+        "SELECT id FROM plans WHERE stripe_price_id = $1",
+        [stripePriceId]
       );
       if (planRes.rows.length === 0) {
-        throw new Error(`Pro plan not found in database for product: ${productName}`);
+        throw new Error(`Pro plan not found in database for price ID: ${stripePriceId}`);
       }
       const proPlanId = planRes.rows[0].id;
       
-      // Compute period: now → now + 1 month
-      const now = new Date();
-      const currentPeriodStart = now.toISOString();
-      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
-      const currentPeriodEnd = periodEnd.toISOString();
+      // Compute period using authoritative item values
+      const currentPeriodStart = new Date(sub.items.data[0].current_period_start * 1000).toISOString();
+      const currentPeriodEnd = new Date(sub.items.data[0].current_period_end * 1000).toISOString();
 
       await db.query("UPDATE subscriptions SET status = 'canceled' WHERE tenant_id = $1 AND status = 'active'", [tenantId]);
       
@@ -126,23 +125,28 @@ webhookRouter.post('/', async (req, res) => {
       const price = await stripe.prices.retrieve(stripePriceId, {expand: ['product']});
       const productName = price.product.name;
       
-      const planRes = await db.query("SELECT id FROM plans WHERE name = $1 OR name = $2", [productName, productName + ' Plan']);
+      const planRes = await db.query("SELECT id FROM plans WHERE stripe_price_id = $1", [stripePriceId]);
       if (planRes.rows.length === 0) {
-        throw new Error(`Unrecognized price/plan ID mapping for product name: ${productName}`);
+        throw new Error(`Unrecognized plan ID mapping for price ID: ${stripePriceId}`);
       }
       const planId = planRes.rows[0].id;
       
-      // Use start_date from the event, compute period end as +1 month
-      const startEpoch = sub.start_date || sub.billing_cycle_anchor || Math.floor(Date.now() / 1000);
-      const currentPeriodStart = new Date(startEpoch * 1000).toISOString();
-      const startDate = new Date(startEpoch * 1000);
-      const currentPeriodEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, startDate.getDate()).toISOString();
+      // Use period from the event items
+      const currentPeriodStart = new Date(sub.items.data[0].current_period_start * 1000).toISOString();
+      const currentPeriodEnd = new Date(sub.items.data[0].current_period_end * 1000).toISOString();
+      
+      // Fetch tenant_id to scope the update
+      const resSub = await db.query("SELECT tenant_id FROM subscriptions WHERE stripe_subscription_id = $1", [sub.id]);
+      if (resSub.rows.length === 0) {
+        throw new Error(`Subscription not found for stripe ID: ${sub.id}`);
+      }
+      const tenantId = resSub.rows[0].tenant_id;
       
       await db.query(`
         UPDATE subscriptions 
         SET status = $1, current_period_start = $2, current_period_end = $3, plan_id = $4
-        WHERE stripe_subscription_id = $5
-      `, [sub.status, currentPeriodStart, currentPeriodEnd, planId, sub.id]);
+        WHERE stripe_subscription_id = $5 AND tenant_id = $6
+      `, [sub.status, currentPeriodStart, currentPeriodEnd, planId, sub.id, tenantId]);
 
 
     } else if (event.type === 'customer.subscription.deleted') {
@@ -153,7 +157,7 @@ webhookRouter.post('/', async (req, res) => {
       if (resSub.rows.length > 0) {
         const tenantId = resSub.rows[0].tenant_id;
         
-        await db.query("UPDATE subscriptions SET status = 'canceled' WHERE stripe_subscription_id = $1", [stripeSubId]);
+        await db.query("UPDATE subscriptions SET status = 'canceled' WHERE stripe_subscription_id = $1 AND tenant_id = $2", [stripeSubId, tenantId]);
         
         const planRes = await db.query("SELECT id FROM plans WHERE name ILIKE '%Free%'");
         if (planRes.rows.length === 0) {

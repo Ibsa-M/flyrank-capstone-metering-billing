@@ -168,8 +168,8 @@ async function recordUsageEvent(tenantId, idempotencyKey, payload) {
     await client.query(`
       UPDATE usage_events 
       SET cost_cents = $1, response_snapshot = $2 
-      WHERE id = $3
-    `, [costCents, responseSnapshot, insertedRowId]);
+      WHERE id = $3 AND tenant_id = $4
+    `, [costCents, responseSnapshot, insertedRowId, tenantId]);
 
     await client.query('COMMIT');
     return { status: 201, data: responseSnapshot };

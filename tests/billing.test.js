@@ -47,7 +47,7 @@ describe('Billing Logic (Phase 2)', () => {
       .send(payload);
 
     expect(res1.status).toBe(201);
-    expect(res1.body.cost_cents).toBe(1);
+    expect(res1.body.cost_cents).toBe(5);
 
     // Second request with exact same key and payload
     const res2 = await request(app)
@@ -91,7 +91,7 @@ describe('Billing Logic (Phase 2)', () => {
     // Seed usage to limit-1 (4)
     await db.query(`
       INSERT INTO usage_events (tenant_id, idempotency_key, request_hash, type, quantity, cost_cents) 
-      VALUES ($1, $2, 'seed_hash', 'api_call', 4, 4)
+      VALUES ($1, $2, 'seed_hash', 'api_call', 4, 20)
     `, [tenantId, crypto.randomUUID()]);
 
     // Request 1: at limit-1 -> limit (should succeed)
@@ -123,7 +123,7 @@ describe('Billing Logic (Phase 2)', () => {
     // Seed usage to limit-5 (5 used)
     await db.query(`
       INSERT INTO usage_events (tenant_id, idempotency_key, request_hash, type, quantity, cost_cents) 
-      VALUES ($1, $2, 'seed_hash', 'api_call', 5, 5)
+      VALUES ($1, $2, 'seed_hash', 'api_call', 5, 25)
     `, [tenantId, crypto.randomUUID()]);
 
     // Fire 10 concurrent requests
