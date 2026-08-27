@@ -92,16 +92,25 @@ webhookRouter.post('/', async (req, res) => {
 
       const subscriptionId = session.subscription;
 
-      // Find Pro plan id
-      const planRes = await db.query("SELECT id FROM plans WHERE name ILIKE '%Pro%'");
+      // Retrieve subscription from Stripe to get the price/product info
+      const sub = await stripe.subscriptions.retrieve(subscriptionId, { expand: ['items.data.price.product'] });
+      const productName = sub.items.data[0].price.product.name;
+
+      // Find plan by exact product name match
+      const planRes = await db.query(
+        "SELECT id FROM plans WHERE name = $1 OR name = $2",
+        [productName, productName + ' Plan']
+      );
       if (planRes.rows.length === 0) {
-        throw new Error("Pro plan not found in database");
+        throw new Error(`Pro plan not found in database for product: ${productName}`);
       }
       const proPlanId = planRes.rows[0].id;
       
-      const sub = await stripe.subscriptions.retrieve(subscriptionId);
-      const currentPeriodStart = new Date(sub.current_period_start * 1000).toISOString();
-      const currentPeriodEnd = new Date(sub.current_period_end * 1000).toISOString();
+      // Compute period: now → now + 1 month
+      const now = new Date();
+      const currentPeriodStart = now.toISOString();
+      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+      const currentPeriodEnd = periodEnd.toISOString();
 
       await db.query("UPDATE subscriptions SET status = 'canceled' WHERE tenant_id = $1 AND status = 'active'", [tenantId]);
       
@@ -123,14 +132,18 @@ webhookRouter.post('/', async (req, res) => {
       }
       const planId = planRes.rows[0].id;
       
-      const currentPeriodStart = new Date(sub.current_period_start * 1000).toISOString();
-      const currentPeriodEnd = new Date(sub.current_period_end * 1000).toISOString();
+      // Use start_date from the event, compute period end as +1 month
+      const startEpoch = sub.start_date || sub.billing_cycle_anchor || Math.floor(Date.now() / 1000);
+      const currentPeriodStart = new Date(startEpoch * 1000).toISOString();
+      const startDate = new Date(startEpoch * 1000);
+      const currentPeriodEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, startDate.getDate()).toISOString();
       
       await db.query(`
         UPDATE subscriptions 
         SET status = $1, current_period_start = $2, current_period_end = $3, plan_id = $4
         WHERE stripe_subscription_id = $5
       `, [sub.status, currentPeriodStart, currentPeriodEnd, planId, sub.id]);
+
 
     } else if (event.type === 'customer.subscription.deleted') {
       const sub = event.data.object;
