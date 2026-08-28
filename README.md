@@ -30,38 +30,42 @@ The system provides endpoints to track fine-grained AI token usage (including re
 ## Setup & Running
 
 1. **Clone & Install Dependencies**
-   ```bash
+```bash
    npm install
-   ```
+```
 
 2. **Environment Variables**
-   Ensure `.env` exists in the root with your database and Stripe credentials:
-   ```env
-   DATABASE_URL=postgresql://postgres:localpass@localhost:5434/billing_dev
-   STRIPE_SECRET_KEY=sk_test_...
-   STRIPE_WEBHOOK_SECRET=whsec_...
-   ALLOW_DEV_RESET=true
-   ```
+   Copy the example file and fill in your own Stripe test-mode keys:
+```bash
+   cp .env.example .env
+```
+   The default `DATABASE_URL` already matches the Docker Compose setup below —
+   no changes needed there for local development.
 
-3. **Database Setup (Migrations)**
-   Apply the migrations manually (using `psql` or `node`) to initialize tables.
-   ```bash
-   psql $DATABASE_URL -f migrations/001_initial_schema.sql
-   psql $DATABASE_URL -f migrations/002_create_stripe_events_table.sql
-   psql $DATABASE_URL -f migrations/003_add_stripe_price_id_to_plans.sql
-   ```
-   *Alternatively, test setups automatically run against their own mock scenarios.*
+3. **Start the Database (one command)**
+   This starts Postgres and automatically applies all migrations on first run:
+```bash
+   docker compose up -d
+```
 
 4. **Run the Application**
-   ```bash
+```bash
    npm start
    # Server listens on port 3000
-   ```
+```
 
-5. **Run Tests**
-   ```bash
+5. **Seed Demo Data (optional)**
+   To create a demo tenant with usage pre-set near, at, or over its quota:
+```bash
+   node scripts/seed_quota.js <tenantName> <planName> <targetUsageApi> <targetUsageAi>
+   # Example: places tenant "demo" on the Pro plan at 999/1000 API calls
+   node scripts/seed_quota.js demo pro 999 0
+```
+
+6. **Run Tests**
+```bash
    npx jest
-   ```
+```
 
 ## Limitations (Out of Scope for Core)
 - **Overage Billing**: Not currently implemented. Once a tenant hits their API or AI token quota, they receive a `429 Too Many Requests` hard cap.

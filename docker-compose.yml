@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: billing-postgres
+    environment:
+      POSTGRES_PASSWORD: localpass
+      POSTGRES_DB: billing_dev
+    ports:
+      - "5434:5432"
+    volumes:
+      - ./migrations:/docker-entrypoint-initdb.d
+      - billing_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  billing_pg_data:
