@@ -4,7 +4,13 @@
   "description": "This project is a usage metering and billing engine built as a capstone project.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:stripe": "jest tests/stripe.test.js",
+    "test:billing": "jest tests/billing.test.js",
+    "test:all": "jest"
   },
   "repository": {
     "type": "git",
