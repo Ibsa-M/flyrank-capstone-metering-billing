@@ -90,6 +90,11 @@ describe('Stripe Webhooks', () => {
       items: [{ price: testProPriceId }],
     });
     testSubscriptionId = sub.id;
+
+    // Update the plans table with the real stripe_price_id from Stripe
+    await db.query(`
+      UPDATE plans SET stripe_price_id = $1 WHERE id = $2
+    `, [testProPriceId, testProPlanId]);
   });
 
   afterAll(async () => {
