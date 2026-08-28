@@ -58,8 +58,8 @@ The system provides endpoints to track fine-grained AI token usage (including re
    To create a demo tenant with usage pre-set near, at, or over its quota:
 ```bash
    node scripts/seed_quota.js <tenantName> <planName> <targetUsageApi> <targetUsageAi>
-   # Example: places tenant "demo" on the Pro plan at 999/1000 API calls
-   node scripts/seed_quota.js demo pro 999 0
+   # Example: places tenant "demo" on the Pro plan near its quota (49999/50000 API calls)
+   node scripts/seed_quota.js demo pro 49999 0
 ```
 
 6. **Run Tests**
